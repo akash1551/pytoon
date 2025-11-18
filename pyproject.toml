@@ -28,6 +28,6 @@ classifiers = [
 keywords = ["toon", "serialization", "parser", "format", "llm", "data"]
 
 [project.urls]
-Homepage = "https://github.com/yourusername/pytoon"
-Source = "https://github.com/yourusername/pytoon"
-Issues = "https://github.com/yourusername/pytoon/issues"
+Homepage = "https://github.com/akash1551/pytoon"
+Source = "https://github.com/akash1551/pytoon"
+Issues = "https://github.com/akash1551/pytoon/issues"
