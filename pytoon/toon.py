@@ -144,7 +144,13 @@ def dumps(obj: Any, name: str = None, indent: int = 0) -> str:
 
     # list / tuple / set
     if isinstance(obj, (list, tuple, set)):
-        lst = list(obj)
+        if isinstance(obj, set):
+            try:
+                lst = sorted(list(obj))
+            except Exception:
+                lst = list(obj)
+        else:
+            lst = list(obj)
         n = len(lst)
         if n == 0:
             return f"{pad}{name}[0]:\n" if name else f"{pad}[]\n"
@@ -184,29 +190,29 @@ def dumps(obj: Any, name: str = None, indent: int = 0) -> str:
         lines = []
         if name:
             lines.append(f"{pad}{name}[{n}]:")
+            item_indent_str = pad + INDENT_STR
+            nested_indent = indent + 2
+        else:
+            item_indent_str = pad
+            nested_indent = indent + 1
+
         for item in lst:
             if _is_primitive(item):
-                lines.append(f"{pad}{INDENT_STR}- {_to_toon_primitive(item)}")
+                lines.append(f"{item_indent_str}- {_to_toon_primitive(item)}")
             else:
                 # migrate dataclass/namedtuple -> dict first
                 if _is_namedtuple_instance(item) or is_dataclass(item):
                     item = _object_to_dict(item)
                 # list item header
-                lines.append(f"{pad}{INDENT_STR}-")
+                lines.append(f"{item_indent_str}-")
                 # nested item content at indent+2 (one level deeper than the '-' line)
-                lines.append(dumps(item, name=None, indent=indent + 2).rstrip("\n"))
+                lines.append(dumps(item, name=None, indent=nested_indent).rstrip("\n"))
         return "\n".join(lines) + "\n"
 
     # fallback for objects: try to convert to dict and include class name
     try:
         obj_dict = _object_to_dict(obj)
-        header = (
-            f"{pad}{obj.__class__.__name__}:"
-            if name is None
-            else f"{pad}{name}: {obj.__class__.__name__}"
-        )
-        serialized = dumps(obj_dict, name=None, indent=indent + 1)
-        return header + "\n" + serialized
+        return dumps(obj_dict, name=name, indent=indent)
     except Exception:
         val = _to_toon_primitive(repr(obj))
         if name:
@@ -323,6 +329,13 @@ def loads(toon_str: str) -> Any:
                 # Deeper indentation than expected: this should be consumed by caller.
                 break
 
+            # Handle explicit empty list "[]"
+            if content.strip() == "[]":
+                idx += 1
+                if arr_mode is None and not result:
+                    return []
+                continue
+
             # Handle list item lines: "- value" or "-" (then nested)
             if content.startswith("- ") or content == "-":
                 if arr_mode is None:
@@ -419,9 +432,25 @@ def loads(toon_str: str) -> Any:
                     result[result_key] = rows
                     continue
                 else:
+                    # Check for list header: name[N]
+                    real_key = key_part
+                    is_list_header = False
+                    if "[" in key_part and key_part.endswith("]"):
+                        try:
+                            name_part, rest = key_part.split("[", 1)
+                            if rest.endswith("]"):
+                                real_key = name_part.strip()
+                                is_list_header = True
+                        except ValueError:
+                            pass
+
                     # nested block "key:" -> parse a nested block at indent+1
                     nested = parse_block(expected_indent + 1)
-                    result[key_part] = nested
+
+                    if is_list_header and nested == {}:
+                        nested = []
+
+                    result[real_key] = nested
                     continue
             else:
                 # inline value exists after colon.
@@ -438,6 +467,11 @@ def loads(toon_str: str) -> Any:
 
         if arr_mode is not None:
             return arr_mode
+
+        # Unwrap anonymous table if it's the only thing
+        if len(result) == 1 and "_table" in result:
+            return result["_table"]
+
         return result
 
     # Start parse from top-level indent 0
