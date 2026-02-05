@@ -1,15 +1,15 @@
-# pytoon
+# python-toon-parser
 
 ![Build Status](https://img.shields.io/badge/build-passing-brightgreen)
 ![Version](https://img.shields.io/badge/pypi-v0.1.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 
-`pytoon` — **TOON** (**T**oken-**O**riented **O**bject **N**otation) serializer and parser for Python.
+`python-toon-parser` — **TOON** (**T**oken-**O**riented **O**bject **N**otation) serializer and parser for Python.
 
 ## Installation
 
 ```bash
-pip install pytoon
+pip install python-toon-parser
 ```
 
 ## Features
