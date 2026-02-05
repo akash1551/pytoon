@@ -132,6 +132,11 @@ def dumps(obj: Any, name: str = None, indent: int = 0) -> str:
             child_pad = INDENT_STR * (indent + 1)
         else:
             child_pad = pad
+        # explicit empty dict representation: return a '{}' line so parser can detect it
+        if not obj:
+            if name:
+                return f"{pad}{name}:\n{child_pad}{{}}\n"
+            return f"{pad}{{}}\n"
         for k, v in obj.items():
             key = _escape_header_key(k)
             if _is_primitive(v):
@@ -241,11 +246,14 @@ def _parse_primitive_token(tok: str):
             return json.loads(tok)
         except Exception:
             return tok[1:-1]
-    # try int/float
+    # try int then float (float handles nan/inf and exponent forms)
     try:
-        if "." in tok:
+        # attempt exact int parsing first
+        try:
+            return int(tok)
+        except Exception:
+            # fall back to float parsing (accepts 'nan', 'inf', '1e3', etc.)
             return float(tok)
-        return int(tok)
     except Exception:
         return tok
 
@@ -335,6 +343,12 @@ def loads(toon_str: str) -> Any:
                 if arr_mode is None and not result:
                     return []
                 continue
+            # Handle explicit empty dict "{}"
+            if content.strip() == "{}":
+                idx += 1
+                if arr_mode is None and not result:
+                    return {}
+                continue
 
             # Handle list item lines: "- value" or "-" (then nested)
             if content.startswith("- ") or content == "-":
@@ -379,8 +393,15 @@ def loads(toon_str: str) -> Any:
                     break
 
             if colon_pos is None:
-                # treat as plain stray content (skip)
+                # No key: treat as a primitive-only line (top-level primitive or inline primitive)
+                val = _parse_primitive_token(content)
                 idx += 1
+                if arr_mode is None and not result:
+                    return val
+                if arr_mode is not None:
+                    arr_mode.append(val)
+                    continue
+                # otherwise skip stray primitive
                 continue
 
             key_part = content[:colon_pos].strip()
